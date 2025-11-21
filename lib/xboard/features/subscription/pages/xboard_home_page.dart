@@ -11,7 +11,6 @@ import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/xboard/features/shared/shared.dart';
 import 'package:fl_clash/xboard/features/latency/services/auto_latency_service.dart';
 import 'package:fl_clash/xboard/features/subscription/services/subscription_status_checker.dart';
-import 'package:fl_clash/xboard/features/auth/pages/login_page.dart';
 import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
 import '../widgets/subscription_usage_card.dart';
 import '../widgets/xboard_connect_button.dart';
@@ -263,19 +262,19 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
         actions: [
           TextButton(
             onPressed: () async {
-              final navigator = Navigator.of(context);
               final userNotifier = ref.read(xboardUserProvider.notifier);
-              navigator.pop();
-              if (!mounted) return;
+              // 先关闭对话框
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+              // 清除错误状态
               userNotifier.clearTokenExpiredError();
+              // 处理 Token 过期（清除数据）
               await userNotifier.handleTokenExpired();
-              if (!mounted) return;
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const LoginPage(),
-                ),
-                (route) => false, // 清除所有路由
-              );
+              // 使用 go_router 导航到登录页（会清除所有路由）
+              if (context.mounted) {
+                context.go('/login');
+              }
             },
             child: Text(appLocalizations.xboardRelogin),
           ),

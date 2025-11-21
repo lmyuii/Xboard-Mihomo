@@ -6,7 +6,7 @@ import 'package:fl_clash/xboard/features/payment/pages/payment_gateway_page.dart
 import 'package:fl_clash/xboard/features/online_support/pages/online_support_page.dart';
 import 'package:fl_clash/xboard/features/invite/pages/invite_page.dart';
 import 'package:fl_clash/xboard/features/auth/pages/login_page.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -82,7 +82,7 @@ final List<RouteBase> routes = [
       path: '/plans/purchase',
       name: 'plan_purchase',
       pageBuilder: (context, state) {
-        final plan = state.extra as Plan;
+        final plan = state.extra as DomainPlan;
         return MaterialPage(
           child: PlanPurchasePage(plan: plan),
         );

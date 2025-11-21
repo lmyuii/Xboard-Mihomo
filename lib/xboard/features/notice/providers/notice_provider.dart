@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 
 /// 公告状态
 class NoticeState {
-  final List<NoticeData> notices;
+  final List<DomainNotice> notices;
   final bool isLoading;
   final String? error;
   final Set<int> dismissedIndices;
@@ -16,7 +17,7 @@ class NoticeState {
   });
 
   /// 获取可见的公告列表（未被关闭的）
-  List<NoticeData> get visibleNotices {
+  List<DomainNotice> get visibleNotices {
     return notices
         .asMap()
         .entries
@@ -26,7 +27,7 @@ class NoticeState {
   }
 
   NoticeState copyWith({
-    List<NoticeData>? notices,
+    List<DomainNotice>? notices,
     bool? isLoading,
     String? error,
     Set<int>? dismissedIndices,
@@ -42,7 +43,9 @@ class NoticeState {
 
 /// 公告Provider
 class NoticeNotifier extends StateNotifier<NoticeState> {
-  NoticeNotifier() : super(const NoticeState());
+  NoticeNotifier(this._ref) : super(const NoticeState());
+
+  final Ref _ref;
 
   /// 获取公告列表
   Future<void> fetchNotices() async {
@@ -51,7 +54,14 @@ class NoticeNotifier extends StateNotifier<NoticeState> {
     state = state.copyWith(isLoading: true, error: null);
     
     try {
-      final notices = await XBoardSDK.getNotices();
+      final noticeRepo = _ref.read(noticeRepositoryProvider);
+      final result = await noticeRepo.getNotices();
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('获取公告失败');
+      }
+      
+      final notices = result.dataOrNull ?? [];
       state = state.copyWith(
         notices: notices,
         isLoading: false,
@@ -78,6 +88,6 @@ class NoticeNotifier extends StateNotifier<NoticeState> {
 
 /// 公告Provider实例
 final noticeProvider = StateNotifierProvider<NoticeNotifier, NoticeState>((ref) {
-  return NoticeNotifier();
+  return NoticeNotifier(ref);
 });
 

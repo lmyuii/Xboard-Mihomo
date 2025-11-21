@@ -1,14 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
 import 'package:fl_clash/xboard/core/core.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('invite_provider.dart');
 
 class InviteState {
-  final InviteData? inviteData;
-  final List<CommissionDetailData> commissionHistory;
-  final UserInfoData? userInfo;
+  final DomainInvite? inviteData;
+  final List<DomainCommission> commissionHistory;
+  final DomainUser? userInfo;
   final bool isLoading;
   final bool isGenerating;
   final bool isLoadingHistory;
@@ -31,9 +32,9 @@ class InviteState {
   });
 
   InviteState copyWith({
-    InviteData? inviteData,
-    List<CommissionDetailData>? commissionHistory,
-    UserInfoData? userInfo,
+    DomainInvite? inviteData,
+    List<DomainCommission>? commissionHistory,
+    DomainUser? userInfo,
     bool? isLoading,
     bool? isGenerating,
     bool? isLoadingHistory,
@@ -57,20 +58,20 @@ class InviteState {
   }
 
   bool get hasInviteData => inviteData != null;
-  bool get hasActiveCodes => inviteData?.codes.any((code) => code.isActive) ?? false;
-  int get totalInvites => inviteData?.totalInvites ?? 0;
-  int get totalCommission => inviteData?.totalCommission ?? 0;
-  int get pendingCommission => inviteData?.pendingCommission ?? 0;
-  int get commissionRate => inviteData?.commissionRate ?? 0;
-  int get availableCommission => inviteData?.availableCommission ?? 0;
-  int get walletBalance => (userInfo?.balance ?? 0).toInt();
+  bool get hasActiveCodes => inviteData?.codes.any((code) => code.isAvailable) ?? false;
+  int get totalInvites => inviteData?.stats.invitedCount ?? 0;
+  double get totalCommission => inviteData?.stats.totalCommission ?? 0.0;
+  double get pendingCommission => inviteData?.stats.pendingCommission ?? 0.0;
+  double get commissionRate => inviteData?.stats.commissionRate ?? 0.0;
+  double get availableCommission => inviteData?.stats.availableCommission ?? 0.0;
+  double get walletBalance => (userInfo?.balanceInCents ?? 0) / 100.0;
   String get formattedCommission => _formatCommissionAmount(totalCommission);
   String get formattedPendingCommission => _formatCommissionAmount(pendingCommission);
   String get formattedAvailableCommission => _formatCommissionAmount(availableCommission);
   String get formattedWalletBalance => _formatCommissionAmount(walletBalance);
 
-  String _formatCommissionAmount(int amount) {
-    final value = amount / 100.0;
+  String _formatCommissionAmount(double amount) {
+    final value = amount;
     if (value >= 1000) {
       return '¥${(value / 1000).toStringAsFixed(1)}k';
     } else {
@@ -92,14 +93,20 @@ class InviteNotifier extends Notifier<InviteState> {
 
     try {
       _logger.info('加载邀请信息...');
-      final inviteData = await XBoardSDK.getInviteInfo();
+      final inviteRepo = ref.read(inviteRepositoryProvider);
+      final result = await inviteRepo.getInviteInfo();
 
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载邀请信息失败');
+      }
+
+      final inviteData = result.dataOrNull;
       state = state.copyWith(
         inviteData: inviteData,
         isLoading: false,
       );
 
-      _logger.info('邀请信息加载成功: ${inviteData.toString()}');
+      _logger.info('邀请信息加载成功');
     } catch (e) {
       _logger.info('加载邀请信息失败: $e');
       state = state.copyWith(
@@ -116,12 +123,19 @@ class InviteNotifier extends Notifier<InviteState> {
 
     try {
       _logger.info('加载佣金历史... 页码: $page');
-      final newHistory = await XBoardSDK.getCommissionHistory(
-        current: page,
+      final inviteRepo = ref.read(inviteRepositoryProvider);
+      final result = await inviteRepo.getCommissionHistory(
+        page: page,
         pageSize: state.historyPageSize,
       );
 
-      List<CommissionDetailData> updatedHistory;
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载佣金历史失败');
+      }
+
+      final newHistory = result.dataOrNull ?? [];
+
+      List<DomainCommission> updatedHistory;
       if (append && newHistory.isNotEmpty) {
         // 追加到现有列表
         updatedHistory = [...state.commissionHistory, ...newHistory];
@@ -156,28 +170,40 @@ class InviteNotifier extends Notifier<InviteState> {
   Future<void> loadUserInfo() async {
     try {
       _logger.info('加载用户信息...');
-      final userInfo = await XBoardSDK.getUserInfo();
+      final userRepo = ref.read(userRepositoryProvider);
+      final result = await userRepo.getUserInfo();
 
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载用户信息失败');
+      }
+
+      final userInfo = result.dataOrNull;
       state = state.copyWith(userInfo: userInfo);
-      _logger.info('用户信息加载成功: 钱包余额 ¥${(userInfo?.balance ?? 0) / 100.0}');
+      _logger.info('用户信息加载成功: 钱包余额 ¥${(userInfo?.balanceInCents ?? 0) / 100.0}');
     } catch (e) {
       _logger.info('加载用户信息失败: $e');
     }
   }
 
-  Future<InviteCodeData?> generateInviteCode() async {
+  Future<DomainInviteCode?> generateInviteCode() async {
     if (state.isGenerating) return null;
 
     state = state.copyWith(isGenerating: true, errorMessage: null);
 
     try {
       _logger.info('生成邀请码...');
-      final newCode = await XBoardSDK.generateInviteCode();
+      final inviteRepo = ref.read(inviteRepositoryProvider);
+      final result = await inviteRepo.generateInviteCode();
 
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('生成邀请码失败');
+      }
+
+      final newCode = result.dataOrNull;
       await loadInviteData();
 
       state = state.copyWith(isGenerating: false);
-      _logger.info('邀请码生成成功: ${newCode?.code}');
+      _logger.info('邀请码生成成功: $newCode');
       return newCode;
     } catch (e) {
       _logger.info('生成邀请码失败: $e');
@@ -189,45 +215,55 @@ class InviteNotifier extends Notifier<InviteState> {
     }
   }
 
-  Future<WithdrawResultData?> withdrawCommission({
+  Future<bool> withdrawCommission({
     required String withdrawMethod,
     required String withdrawAccount,
   }) async {
-    if (state.isLoading) return null;
+    if (state.isLoading) return false;
 
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
       _logger.info('提现佣金: 方式=$withdrawMethod, 账号=$withdrawAccount');
-      final result = await XBoardSDK.withdrawCommission(
-        withdrawMethod: withdrawMethod,
-        withdrawAccount: withdrawAccount,
+      final inviteRepo = ref.read(inviteRepositoryProvider);
+      final result = await inviteRepo.withdrawCommission(
+        method: withdrawMethod,
+        account: withdrawAccount,
       );
+
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('提现申请失败');
+      }
 
       await loadInviteData();
       await refreshCommissionHistory();
 
       state = state.copyWith(isLoading: false);
       _logger.info('提现申请提交成功');
-      return result;
+      return true;
     } catch (e) {
       _logger.info('提现申请失败: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
-      return null;
+      return false;
     }
   }
 
-  Future<TransferResultData?> transferCommission(double amount) async {
-    if (state.isLoading) return null;
+  Future<bool> transferCommission(double amount) async {
+    if (state.isLoading) return false;
     
     state = state.copyWith(isLoading: true, errorMessage: null);
     
     try {
       _logger.info('划转佣金到钱包: ¥$amount');
-      final result = await XBoardSDK.transferCommissionToBalance(amount);
+      final inviteRepo = ref.read(inviteRepositoryProvider);
+      final result = await inviteRepo.transferCommissionToBalance(amount);
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('划转失败');
+      }
       
       await Future.wait([
         loadInviteData(),
@@ -236,14 +272,14 @@ class InviteNotifier extends Notifier<InviteState> {
       
       state = state.copyWith(isLoading: false);
       _logger.info('划转成功');
-      return result;
+      return true;
     } catch (e) {
       _logger.info('划转失败: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
-      return null;
+      return false;
     }
   }
 

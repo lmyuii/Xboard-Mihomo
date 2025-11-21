@@ -41,3 +41,5 @@ export 'network/network.dart';
 // ===== 导出缓存模块 =====
 export 'cache/cache.dart';
 
+// ===== 导出 Repository 实现 =====
+export 'repositories/xboard/xboard_repositories.dart';

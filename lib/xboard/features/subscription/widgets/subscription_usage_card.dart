@@ -4,13 +4,13 @@ import 'package:fl_clash/xboard/features/subscription/providers/xboard_subscript
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/models/models.dart' as fl_models;
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:go_router/go_router.dart';
 import '../services/subscription_status_service.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 class SubscriptionUsageCard extends ConsumerWidget {
-  final SubscriptionData? subscriptionInfo;
-  final UserInfoData? userInfo;
+  final DomainSubscription? subscriptionInfo;
+  final DomainUser? userInfo;
   final fl_models.SubscriptionInfo? profileSubscriptionInfo;
   const SubscriptionUsageCard({
     super.key,
@@ -266,10 +266,12 @@ class SubscriptionUsageCard extends ConsumerWidget {
         plans = ref.read(xboardSubscriptionProvider);
       }
       
-      final currentPlan = plans.cast<Plan?>().firstWhere(
-        (plan) => plan?.id == currentPlanId,
-        orElse: () => null,
-      );
+      DomainPlan? currentPlan;
+      try {
+        currentPlan = plans.firstWhere((plan) => plan.id == currentPlanId);
+      } catch (e) {
+        currentPlan = null;
+      }
       
       if (currentPlan != null) {
         if (isDesktop) {
@@ -500,7 +502,7 @@ class SubscriptionUsageCard extends ConsumerWidget {
     if (profileSubscriptionInfo != null && profileSubscriptionInfo!.total > 0) {
       return profileSubscriptionInfo!.total.toDouble();
     }
-    return userInfo?.transferEnable ?? 0;
+    return userInfo?.transferLimit?.toDouble() ?? 0;
   }
   Color _getProgressColor(double progress, ThemeData theme) {
     if (progress >= 0.9) {

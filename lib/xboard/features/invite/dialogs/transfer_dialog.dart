@@ -25,7 +25,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
   @override
   Widget build(BuildContext context) {
     final inviteState = ref.read(inviteProvider);
-    final double maxAmount = inviteState.availableCommission / 100.0;  // 使用可用佣金而不是总佣金
+    final double maxAmount = inviteState.availableCommission;  // 已经是元，不需要再除以100
 
     return AlertDialog(
       title: Text(appLocalizations.transferToWallet),
@@ -79,7 +79,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
                         key: const ValueKey('loading-text'),
                       )
                     : Text(
-                        appLocalizations.maxTransferable((inviteState.availableCommission / 100.0).toStringAsFixed(2)),
+                        appLocalizations.maxTransferable(inviteState.availableCommission.toStringAsFixed(2)),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -161,10 +161,10 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
       if (mounted) {
         setState(() {
           _isTransferring = false;
-          _isSuccess = result != null && result.success;
+          _isSuccess = result;
         });
         
-        if (result != null && result.success) {
+        if (result) {
           // 成功后显示动画，然后自动关闭
           await Future.delayed(const Duration(milliseconds: 1500));
           if (mounted && Navigator.of(context).canPop()) {
@@ -177,7 +177,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
             });
           }
         } else {
-          XBoardNotification.showError(appLocalizations.transferFailed(result?.message ?? "未知错误"));
+          XBoardNotification.showError(appLocalizations.transferFailed("划转失败"));
         }
       }
     } catch (e) {

@@ -12,14 +12,18 @@ class WithdrawDialog extends ConsumerStatefulWidget {
 }
 
 class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
-  final TextEditingController _methodController = TextEditingController();
   final TextEditingController _accountController = TextEditingController();
   bool _isWithdrawing = false;
   bool _isSuccess = false;
+  
+  // 提现方式列表
+  // TODO: 未来可以通过 SystemConfig API 从后端获取: config.withdrawMethods
+  // 接口: /api/v1/user/comm/config -> SystemConfig.withdrawMethods
+  final List<String> _withdrawMethods = ['支付宝', '微信', '银行卡', 'PayPal', 'USDT'];
+  String? _selectedMethod;
 
   @override
   void dispose() {
-    _methodController.dispose();
     _accountController.dispose();
     super.dispose();
   }
@@ -27,7 +31,7 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
   @override
   Widget build(BuildContext context) {
     final inviteState = ref.read(inviteProvider);
-    final double availableAmount = inviteState.availableCommission / 100.0;
+    final double availableAmount = inviteState.availableCommission;  // 已经是元，不需要再除以100
 
     return AlertDialog(
       title: Text(appLocalizations.withdrawCommission),
@@ -91,14 +95,25 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
           ),
           const SizedBox(height: 16),
           if (!_isWithdrawing && !_isSuccess) ...[
-            TextField(
-              controller: _methodController,
+            DropdownButtonFormField<String>(
+              value: _selectedMethod,
               decoration: InputDecoration(
                 labelText: '提现方式',
-                hintText: '如：支付宝、微信、银行卡',
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.payment),
               ),
+              items: _withdrawMethods.map((String method) {
+                return DropdownMenuItem<String>(
+                  value: method,
+                  child: Text(method),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedMethod = newValue;
+                });
+              },
+              hint: const Text('请选择提现方式'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -138,16 +153,14 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
   }
 
   Future<void> _performWithdraw() async {
-    final method = _methodController.text.trim();
-    final account = _accountController.text.trim();
-    
-    if (method.isEmpty) {
+    if (_selectedMethod == null || _selectedMethod!.isEmpty) {
       if (mounted) {
-        XBoardNotification.showError('请输入提现方式');
+        XBoardNotification.showError('请选择提现方式');
       }
       return;
     }
     
+    final account = _accountController.text.trim();
     if (account.isEmpty) {
       if (mounted) {
         XBoardNotification.showError('请输入提现账号');
@@ -161,17 +174,17 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
     
     try {
       final result = await ref.read(inviteProvider.notifier).withdrawCommission(
-        withdrawMethod: method,
+        withdrawMethod: _selectedMethod!,
         withdrawAccount: account,
       );
       
       if (mounted) {
         setState(() {
           _isWithdrawing = false;
-          _isSuccess = result != null && result.success;
+          _isSuccess = result;
         });
         
-        if (result != null && result.success) {
+        if (result) {
           // 成功后显示动画，然后自动关闭
           await Future.delayed(const Duration(milliseconds: 1500));
           if (mounted && Navigator.of(context).canPop()) {
@@ -184,7 +197,7 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
             });
           }
         } else {
-          XBoardNotification.showError('提交失败：${result?.message ?? "未知错误"}');
+          XBoardNotification.showError('提交失败');
         }
       }
     } catch (e) {

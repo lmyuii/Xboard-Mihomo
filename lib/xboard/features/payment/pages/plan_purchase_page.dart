@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/sdk/xboard_sdk.dart' show XBoardSDK, PaymentMethod, CouponData;
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
 import 'package:fl_clash/xboard/features/payment/providers/xboard_payment_provider.dart';
@@ -24,7 +25,7 @@ final _logger = FileLogger('plan_purchase_page.dart');
 
 /// 套餐购买页面
 class PlanPurchasePage extends ConsumerStatefulWidget {
-  final Plan plan;
+  final DomainPlan plan;
   final bool embedded; // 是否为嵌入模式（桌面端页面内切换时使用）
   final VoidCallback? onBack; // 返回回调
 
@@ -103,35 +104,35 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
     final plan = widget.plan;
     final l10n = AppLocalizations.of(context);
 
-    if (plan.monthPrice != null) {
+    if (plan.monthlyPrice != null) {
       periods.add({
         'period': 'month_price',
         'label': l10n.xboardMonthlyPayment,
-        'price': plan.monthPrice!,
+        'price': plan.monthlyPrice!,
         'description': l10n.xboardMonthlyRenewal,
       });
     }
-    if (plan.quarterPrice != null) {
+    if (plan.quarterlyPrice != null) {
       periods.add({
         'period': 'quarter_price',
         'label': l10n.xboardQuarterlyPayment,
-        'price': plan.quarterPrice!,
+        'price': plan.quarterlyPrice!,
         'description': l10n.xboardThreeMonthCycle,
       });
     }
-    if (plan.halfYearPrice != null) {
+    if (plan.halfYearlyPrice != null) {
       periods.add({
         'period': 'half_year_price',
         'label': l10n.xboardHalfYearlyPayment,
-        'price': plan.halfYearPrice!,
+        'price': plan.halfYearlyPrice!,
         'description': l10n.xboardSixMonthCycle,
       });
     }
-    if (plan.yearPrice != null) {
+    if (plan.yearlyPrice != null) {
       periods.add({
         'period': 'year_price',
         'label': l10n.xboardYearlyPayment,
-        'price': plan.yearPrice!,
+        'price': plan.yearlyPrice!,
         'description': l10n.xboardTwelveMonthCycle,
       });
     }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_clash/l10n/l10n.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import '../utils/price_calculator.dart';
 
 /// 套餐信息头部卡片
 class PlanHeaderCard extends StatelessWidget {
-  final Plan plan;
+  final DomainPlan plan;
 
   const PlanHeaderCard({
     super.key,
@@ -13,10 +13,10 @@ class PlanHeaderCard extends StatelessWidget {
   });
 
   String _getTrafficDisplay(BuildContext context) {
-    if (plan.transferEnable == 0) {
+    if (plan.transferQuota == 0) {
       return AppLocalizations.of(context).xboardUnlimited;
     }
-    return PriceCalculator.formatTraffic(plan.transferEnable);
+    return PriceCalculator.formatTraffic(plan.transferQuota.toDouble());
   }
 
   String _getSpeedLimitDisplay(BuildContext context) {

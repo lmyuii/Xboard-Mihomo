@@ -1,4 +1,4 @@
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
@@ -90,7 +90,7 @@ class CommissionHistoryCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildCommissionItem(BuildContext context, CommissionDetailData commission) {
+  Widget _buildCommissionItem(BuildContext context, DomainCommission commission) {
     final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -114,7 +114,7 @@ class CommissionHistoryCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¥${commission.getAmountInYuan.toStringAsFixed(2)}',
+                  '¥${commission.amount.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -138,13 +138,6 @@ class CommissionHistoryCard extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-              Text(
-                appLocalizations.orderAmount('¥${commission.orderAmountInYuan.toStringAsFixed(2)}'),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ],

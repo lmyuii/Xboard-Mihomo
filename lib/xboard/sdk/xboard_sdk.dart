@@ -260,6 +260,39 @@ class XBoardSDK {
     }
   }
 
+  /// 验证 Token 是否有效
+  static Future<bool> validateToken() async {
+    try {
+      final result = await _sdk.userInfo.validateToken();
+      return result.data ?? false;
+    } catch (e) {
+      _logger.error('[SDK] 验证Token失败', e);
+      return false;
+    }
+  }
+
+  /// 切换流量提醒
+  static Future<bool> toggleTrafficReminder(bool enabled) async {
+    try {
+      await _sdk.userInfo.toggleTrafficReminder(enabled);
+      return true;
+    } catch (e) {
+      _logger.error('[SDK] 切换流量提醒失败', e);
+      return false;
+    }
+  }
+
+  /// 切换到期提醒
+  static Future<bool> toggleExpireReminder(bool enabled) async {
+    try {
+      await _sdk.userInfo.toggleExpireReminder(enabled);
+      return true;
+    } catch (e) {
+      _logger.error('[SDK] 切换到期提醒失败', e);
+      return false;
+    }
+  }
+
   // ========== 套餐相关 ==========
 
   /// 获取套餐列表

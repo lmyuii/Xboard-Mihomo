@@ -1,15 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
 import 'package:fl_clash/xboard/features/auth/auth.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
 import 'package:fl_clash/xboard/core/core.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('xboard_subscription_provider.dart');
 
-class XBoardSubscriptionNotifier extends Notifier<List<Plan>> {
+class XBoardSubscriptionNotifier extends Notifier<List<DomainPlan>> {
   @override
-  List<Plan> build() {
+  List<DomainPlan> build() {
     ref.listen(xboardUserAuthProvider, (previous, next) {
       if (next.isAuthenticated) {
         if (previous?.isAuthenticated != true) {
@@ -19,12 +20,12 @@ class XBoardSubscriptionNotifier extends Notifier<List<Plan>> {
         _clearPlans();
       }
     });
-    return const <Plan>[];  // 明确指定类型
+    return const <DomainPlan>[];  // 明确指定类型
   }
   Future<void> loadPlans() async {
     final userAuthState = ref.read(xboardUserAuthProvider);
     if (!userAuthState.isAuthenticated) {
-      state = <Plan>[];
+      state = <DomainPlan>[];
       ref.read(userUIStateProvider.notifier).state = const UIState(
         errorMessage: '请先登录',
       );
@@ -33,7 +34,14 @@ class XBoardSubscriptionNotifier extends Notifier<List<Plan>> {
     ref.read(userUIStateProvider.notifier).state = const UIState(isLoading: true);
     try {
       _logger.info('开始加载套餐列表...');
-      final plans = await XBoardSDK.getPlans();
+      final planRepo = ref.read(planRepositoryProvider);
+      final result = await planRepo.getPlans();
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载套餐列表失败');
+      }
+      
+      final plans = result.dataOrNull ?? [];
       final visiblePlans = plans.where((plan) => plan.isVisible).toList();
       // 按 sort 字段排序（升序），null 值排在最后
       visiblePlans.sort((a, b) {
@@ -60,22 +68,23 @@ class XBoardSubscriptionNotifier extends Notifier<List<Plan>> {
     _logger.info('刷新套餐列表...');
     await loadPlans();
   }
-  Plan? getPlanById(int planId) {
+  DomainPlan? getPlanById(int planId) {
     try {
       return state.firstWhere((plan) => plan.id == planId);
     } catch (e) {
       return null;
     }
   }
-  List<Plan> get plansWithPrice {
+  List<DomainPlan> get plansWithPrice {
     return state.where((plan) => plan.hasPrice).toList();
   }
-  List<Plan> get recommendedPlans {
+  
+  List<DomainPlan> get recommendedPlans {
     return state.where((plan) => plan.isVisible && plan.hasPrice).take(3).toList();
   }
   void _clearPlans() {
     _logger.info('清空套餐列表');
-    state = <Plan>[];
+    state = <DomainPlan>[];
     ref.read(userUIStateProvider.notifier).state = const UIState();
   }
   void clearError() {
@@ -98,10 +107,11 @@ class XBoardSubscriptionNotifier extends Notifier<List<Plan>> {
     }
   }
 }
-final xboardSubscriptionProvider = NotifierProvider<XBoardSubscriptionNotifier, List<Plan>>(
+final xboardSubscriptionProvider = NotifierProvider<XBoardSubscriptionNotifier, List<DomainPlan>>(
   XBoardSubscriptionNotifier.new,
 );
-final xboardPlanProvider = Provider.family<Plan?, int>((ref, planId) {
+
+final xboardPlanProvider = Provider.family<DomainPlan?, int>((ref, planId) {
   final plans = ref.watch(xboardSubscriptionProvider);
   try {
     return plans.firstWhere((plan) => plan.id == planId);
@@ -109,11 +119,13 @@ final xboardPlanProvider = Provider.family<Plan?, int>((ref, planId) {
     return null;
   }
 });
-final xboardPlansWithPriceProvider = Provider<List<Plan>>((ref) {
+
+final xboardPlansWithPriceProvider = Provider<List<DomainPlan>>((ref) {
   final plans = ref.watch(xboardSubscriptionProvider);
   return plans.where((plan) => plan.hasPrice).toList();
 });
-final xboardRecommendedPlansProvider = Provider<List<Plan>>((ref) {
+
+final xboardRecommendedPlansProvider = Provider<List<DomainPlan>>((ref) {
   final plans = ref.watch(xboardSubscriptionProvider);
   return plans.where((plan) => plan.isVisible && plan.hasPrice).take(3).toList();
-}); 
+});

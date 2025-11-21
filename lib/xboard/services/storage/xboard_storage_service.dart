@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/infrastructure/infrastructure.dart';
 import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 
 /// XBoard 存储服务
 ///
@@ -18,8 +19,10 @@ class XBoardStorageService {
 
   // 存储键定义
   static const String _userEmailKey = 'xboard_user_email';
-  static const String _userInfoKey = 'xboard_user_info';
-  static const String _subscriptionInfoKey = 'xboard_subscription_info';
+  static const String _userInfoKey = 'xboard_user_info';  // 保留兼容
+  static const String _subscriptionInfoKey = 'xboard_subscription_info';  // 保留兼容
+  static const String _domainUserKey = 'xboard_domain_user';  // 新：领域模型
+  static const String _domainSubscriptionKey = 'xboard_domain_subscription';  // 新：领域模型
   static const String _tunFirstUseKey = 'xboard_tun_first_use_shown';
   static const String _savedEmailKey = 'xboard_saved_email';
   static const String _savedPasswordKey = 'xboard_saved_password';
@@ -73,7 +76,83 @@ class XBoardStorageService {
     );
   }
 
-  // ===== 订阅信息 =====
+  // ===== 领域模型：用户信息 =====
+
+  Future<Result<bool>> saveDomainUser(DomainUser user) async {
+    try {
+      final userJson = jsonEncode(user.toJson());
+      return await _storage.setString(_domainUserKey, userJson);
+    } catch (e, stackTrace) {
+      return Result.failure(XBoardStorageException(
+        message: '保存领域用户信息失败',
+        operation: 'write',
+        key: _domainUserKey,
+        originalError: e,
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  Future<Result<DomainUser?>> getDomainUser() async {
+    final result = await _storage.getString(_domainUserKey);
+    return result.when(
+      success: (userJson) {
+        if (userJson == null) return Result.success(null);
+        try {
+          final Map<String, dynamic> userMap = jsonDecode(userJson);
+          return Result.success(DomainUser.fromJson(userMap));
+        } catch (e, stackTrace) {
+          return Result.failure(XBoardParseException(
+            message: '解析领域用户信息失败',
+            dataType: 'DomainUser',
+            originalError: e,
+            stackTrace: stackTrace,
+          ));
+        }
+      },
+      failure: (error) => Result.failure(error),
+    );
+  }
+
+  // ===== 领域模型：订阅信息 =====
+
+  Future<Result<bool>> saveDomainSubscription(DomainSubscription subscription) async {
+    try {
+      final subscriptionJson = jsonEncode(subscription.toJson());
+      return await _storage.setString(_domainSubscriptionKey, subscriptionJson);
+    } catch (e, stackTrace) {
+      return Result.failure(XBoardStorageException(
+        message: '保存领域订阅信息失败',
+        operation: 'write',
+        key: _domainSubscriptionKey,
+        originalError: e,
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  Future<Result<DomainSubscription?>> getDomainSubscription() async {
+    final result = await _storage.getString(_domainSubscriptionKey);
+    return result.when(
+      success: (subscriptionJson) {
+        if (subscriptionJson == null) return Result.success(null);
+        try {
+          final Map<String, dynamic> subscriptionMap = jsonDecode(subscriptionJson);
+          return Result.success(DomainSubscription.fromJson(subscriptionMap));
+        } catch (e, stackTrace) {
+          return Result.failure(XBoardParseException(
+            message: '解析领域订阅信息失败',
+            dataType: 'DomainSubscription',
+            originalError: e,
+            stackTrace: stackTrace,
+          ));
+        }
+      },
+      failure: (error) => Result.failure(error),
+    );
+  }
+
+  // ===== 订阅信息（保留兼容） =====
 
   Future<Result<bool>> saveSubscriptionInfo(SubscriptionData subscriptionInfo) async {
     try {
@@ -118,6 +197,8 @@ class XBoardStorageService {
       _storage.remove(_userEmailKey),
       _storage.remove(_userInfoKey),
       _storage.remove(_subscriptionInfoKey),
+      _storage.remove(_domainUserKey),  // 清理领域模型
+      _storage.remove(_domainSubscriptionKey),  // 清理领域模型
     ]);
     
     final allSuccess = results.every((r) => r.dataOrNull == true);

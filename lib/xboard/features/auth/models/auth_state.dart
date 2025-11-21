@@ -1,4 +1,4 @@
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 
 /// 通用UI状态
 class UIState {
@@ -52,8 +52,8 @@ class UserAuthState {
   final String? email;
   final bool isLoading;
   final String? errorMessage;
-  final UserInfoData? userInfo;
-  final SubscriptionData? subscriptionInfo;
+  final DomainUser? userInfo;
+  final DomainSubscription? subscriptionInfo;
 
   const UserAuthState({
     this.isAuthenticated = false,
@@ -71,8 +71,8 @@ class UserAuthState {
     String? email,
     bool? isLoading,
     String? errorMessage,
-    UserInfoData? userInfo,
-    SubscriptionData? subscriptionInfo,
+    DomainUser? userInfo,
+    DomainSubscription? subscriptionInfo,
   }) {
     return UserAuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,

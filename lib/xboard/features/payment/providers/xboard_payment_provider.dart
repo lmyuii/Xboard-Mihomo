@@ -1,14 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
 import 'package:fl_clash/xboard/features/auth/auth.dart';
 import 'package:fl_clash/xboard/features/payment/payment.dart';
 import 'package:fl_clash/xboard/core/core.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('xboard_payment_provider.dart');
 
-final pendingOrdersProvider = StateProvider<List<OrderData>>((ref) => []);
-final paymentMethodsProvider = StateProvider<List<PaymentMethodData>>((ref) => []);
+final pendingOrdersProvider = StateProvider<List<DomainOrder>>((ref) => []);
+final paymentMethodsProvider = StateProvider<List<DomainPaymentMethod>>((ref) => []);
 final paymentProcessStateProvider = StateProvider<PaymentProcessState>((ref) => const PaymentProcessState());
 
 class XBoardPaymentNotifier extends Notifier<void> {
@@ -45,7 +46,14 @@ class XBoardPaymentNotifier extends Notifier<void> {
     ref.read(userUIStateProvider.notifier).state = const UIState(isLoading: true);
     try {
       _logger.info('加载待支付订单...');
-      final orders = await XBoardSDK.getOrders();
+      final orderRepo = ref.read(orderRepositoryProvider);
+      final result = await orderRepo.getOrders();
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载订单失败');
+      }
+      
+      final orders = result.dataOrNull ?? [];
       // status: 0=待付款, 1=开通中, 2=已取消, 3=已完成, 4=已折抵
       final pendingOrders = orders.where((order) => order.status == 0).toList();
       ref.read(pendingOrdersProvider.notifier).state = pendingOrders;
@@ -68,7 +76,14 @@ class XBoardPaymentNotifier extends Notifier<void> {
     }
     try {
       _logger.info('加载支付方式...');
-      final List<PaymentMethodData> paymentMethods = await XBoardSDK.getPaymentMethods();
+      final paymentRepo = ref.read(paymentRepositoryProvider);
+      final result = await paymentRepo.getPaymentMethods();
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('加载支付方式失败');
+      }
+      
+      final paymentMethods = result.dataOrNull ?? [];
       ref.read(paymentMethodsProvider.notifier).state = paymentMethods;
       _logger.info('支付方式加载成功，共 ${paymentMethods.length} 个');
     } catch (e) {
@@ -97,14 +112,20 @@ class XBoardPaymentNotifier extends Notifier<void> {
       // 先取消待支付订单
       await cancelPendingOrders();
 
-      // 调用域名服务创建订单
-      final tradeNo = await XBoardSDK.createOrder(
+      // 调用 Repository 创建订单
+      final orderRepo = ref.read(orderRepositoryProvider);
+      final result = await orderRepo.createOrder(
         planId: planId,
         period: period,
         couponCode: couponCode,
       );
 
-      if (tradeNo != null) {
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('创建订单失败');
+      }
+
+      final tradeNo = result.dataOrNull;
+      if (tradeNo != null && tradeNo.isNotEmpty) {
         ref.read(paymentProcessStateProvider.notifier).state = PaymentProcessState(
           currentOrderTradeNo: tradeNo,
         );
@@ -150,20 +171,30 @@ class XBoardPaymentNotifier extends Notifier<void> {
     try {
       _logger.info('提交支付: tradeNo=$tradeNo, method=$method');
 
-      // 调用域名服务提交支付，返回支付结果
-      final paymentResult = await XBoardSDK.submitPayment(
+      // 调用 Repository 提交支付，返回支付结果
+      final paymentRepo = ref.read(paymentRepositoryProvider);
+      final result = await paymentRepo.submitPayment(
         tradeNo: tradeNo,
-        method: int.tryParse(method) ?? 0,
+        methodId: int.tryParse(method) ?? 0,
       );
 
       ref.read(paymentProcessStateProvider.notifier).state = const PaymentProcessState(
         isProcessingPayment: false,
       );
 
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('支付提交失败');
+      }
+
+      final paymentResult = result.dataOrNull;
       if (paymentResult != null) {
         await loadPendingOrders();
         _logger.info('支付提交成功，结果: $paymentResult');
-        return paymentResult;
+        // 将 PaymentResult 转换为 Map
+        return {
+          'type': paymentResult.type,
+          'data': paymentResult.data,
+        };
       }
       return null;
     } catch (e) {
@@ -188,16 +219,23 @@ class XBoardPaymentNotifier extends Notifier<void> {
     ref.read(userUIStateProvider.notifier).state = const UIState(isLoading: true);
     try {
       // 获取所有订单并筛选待支付的
-      final orders = await XBoardSDK.getOrders();
+      final orderRepo = ref.read(orderRepositoryProvider);
+      final result = await orderRepo.getOrders();
+      
+      if (result.isFailure) {
+        throw result.exceptionOrNull ?? Exception('获取订单失败');
+      }
+      
+      final orders = result.dataOrNull ?? [];
       // status: 0=待付款, 1=开通中, 2=已取消, 3=已完成, 4=已折抵
       final pendingOrders = orders.where((order) => order.status == 0).toList();
 
       int canceledCount = 0;
       for (final order in pendingOrders) {
-        if (order.tradeNo != null) {
+        if (order.tradeNo != null && order.tradeNo!.isNotEmpty) {
           try {
-            final success = await XBoardSDK.cancelOrder(order.tradeNo!);
-            if (success) {
+            final cancelResult = await orderRepo.cancelOrder(order.tradeNo!);
+            if (cancelResult.isSuccess) {
               canceledCount++;
             }
           } catch (e) {
@@ -232,12 +270,12 @@ class XBoardPaymentNotifier extends Notifier<void> {
 final xboardPaymentProvider = NotifierProvider<XBoardPaymentNotifier, void>(
   XBoardPaymentNotifier.new,
 );
-final xboardAvailablePaymentMethodsProvider = Provider<List<PaymentMethodData>>((ref) {
+final xboardAvailablePaymentMethodsProvider = Provider<List<DomainPaymentMethod>>((ref) {
   final paymentMethods = ref.watch(paymentMethodsProvider);
-  // PaymentMethod 没有 isAvailable 字段，返回所有支付方式
+  // 返回所有支付方式
   return paymentMethods;
 });
-final xboardPaymentMethodProvider = Provider.family<PaymentMethodData?, String>((ref, methodId) {
+final xboardPaymentMethodProvider = Provider.family<DomainPaymentMethod?, String>((ref, methodId) {
   final paymentMethods = ref.watch(paymentMethodsProvider);
   try {
     return paymentMethods.firstWhere((method) => method.id.toString() == methodId);

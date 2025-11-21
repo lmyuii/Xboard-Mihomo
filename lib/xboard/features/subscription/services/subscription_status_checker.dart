@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:fl_clash/xboard/features/subscription/widgets/subscription_status_dialog.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
 import 'package:fl_clash/xboard/features/subscription/providers/xboard_subscription_provider.dart';
@@ -117,10 +117,12 @@ class SubscriptionStatusChecker {
         plans = ref.read(xboardSubscriptionProvider);
       }
       
-      final currentPlan = plans.firstWhere(
-        (plan) => plan.id == currentPlanId,
-        orElse: () => null as Plan,
-      );
+      DomainPlan? currentPlan;
+      try {
+        currentPlan = plans.firstWhere((plan) => plan.id == currentPlanId);
+      } catch (e) {
+        currentPlan = null;
+      }
       
       if (currentPlan != null) {
         _logger.info('[套餐续费] 找到当前套餐，跳转到购买页面: ${currentPlan.name}');

@@ -1,4 +1,4 @@
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
@@ -127,7 +127,7 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
     );
   }
 
-  Widget _buildCommissionItem(CommissionDetailData commission) {
+  Widget _buildCommissionItem(DomainCommission commission) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -148,7 +148,7 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¥${commission.getAmountInYuan.toStringAsFixed(2)}',
+                  '¥${commission.amount.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -172,13 +172,6 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
-                ),
-              ),
-              Text(
-                appLocalizations.orderAmount('¥${commission.orderAmountInYuan.toStringAsFixed(2)}'),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[500],
                 ),
               ),
             ],

@@ -1,6 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/l10n/l10n.dart';
-import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
 import 'package:fl_clash/xboard/features/subscription/providers/xboard_subscription_provider.dart';
 import 'plan_purchase_page.dart';
@@ -14,7 +14,7 @@ class PlansView extends ConsumerStatefulWidget {
   ConsumerState<PlansView> createState() => _PlansViewState();
 }
 class _PlansViewState extends ConsumerState<PlansView> {
-  Plan? _selectedPlan; // 桌面端选中的套餐
+  DomainPlan? _selectedPlan; // 桌面端选中的套餐
   bool _hasCheckedUrlParams = false; // 标记是否已检查URL参数
   
   @override
@@ -42,10 +42,12 @@ class _PlansViewState extends ConsumerState<PlansView> {
       if (planId != null) {
         // 查找对应的套餐
         final plans = ref.read(xboardSubscriptionProvider);
-        final plan = plans.cast<Plan?>().firstWhere(
-          (p) => p?.id == planId,
-          orElse: () => null,
-        );
+        DomainPlan? plan;
+        try {
+          plan = plans.firstWhere((p) => p.id == planId);
+        } catch (e) {
+          plan = null;
+        }
         
         if (plan != null) {
           // UI层：从URL参数选中套餐
@@ -77,12 +79,12 @@ class _PlansViewState extends ConsumerState<PlansView> {
     }
     return '${transferEnable.toStringAsFixed(0)}GB';
   }
-  String _getLowestPrice(Plan plan) {
+  String _getLowestPrice(DomainPlan plan) {
     List<double> prices = [];
-    if (plan.monthPrice != null) prices.add(plan.monthPrice!);
-    if (plan.quarterPrice != null) prices.add(plan.quarterPrice!);
-    if (plan.halfYearPrice != null) prices.add(plan.halfYearPrice!);
-    if (plan.yearPrice != null) prices.add(plan.yearPrice!);
+    if (plan.monthlyPrice != null) prices.add(plan.monthlyPrice!);
+    if (plan.quarterlyPrice != null) prices.add(plan.quarterlyPrice!);
+    if (plan.halfYearlyPrice != null) prices.add(plan.halfYearlyPrice!);
+    if (plan.yearlyPrice != null) prices.add(plan.yearlyPrice!);
     if (plan.twoYearPrice != null) prices.add(plan.twoYearPrice!);
     if (plan.threeYearPrice != null) prices.add(plan.threeYearPrice!);
     if (plan.onetimePrice != null) prices.add(plan.onetimePrice!);
@@ -90,13 +92,13 @@ class _PlansViewState extends ConsumerState<PlansView> {
     final lowestPrice = prices.reduce((a, b) => a < b ? a : b);
     return _formatPrice(lowestPrice);
   }
-  String _getSpeedLimitText(Plan plan) {
+  String _getSpeedLimitText(DomainPlan plan) {
     if (plan.speedLimit == null) {
       return AppLocalizations.of(context).xboardUnlimited; // 不限速
     }
     return '${plan.speedLimit} Mbps';
   }
-  Widget _buildPlanCard(Plan plan) {
+  Widget _buildPlanCard(DomainPlan plan) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 768;
     return Card(
@@ -148,7 +150,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
                 Icon(Icons.data_usage, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text(
-                  '${AppLocalizations.of(context).xboardTraffic}: ${_formatTraffic(plan.transferEnable)}',
+                  '${AppLocalizations.of(context).xboardTraffic}: ${_formatTraffic(plan.transferQuota.toDouble())}',
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(width: 16),
@@ -160,9 +162,9 @@ class _PlansViewState extends ConsumerState<PlansView> {
                 ),
               ],
             ),
-            if (plan.content != null) ...[
+            if (plan.description != null) ...[
               SizedBox(height: isDesktop ? 8 : 12),
-              PlanDescriptionWidget(content: plan.content!),
+              PlanDescriptionWidget(content: plan.description!),
             ],
             SizedBox(height: isDesktop ? 12 : 20),
             if (plan.hasPrice)
@@ -188,7 +190,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
       ),
     );
   }
-  void _navigateToPurchase(Plan plan) {
+  void _navigateToPurchase(DomainPlan plan) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 768;
     
